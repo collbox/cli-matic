@@ -7,6 +7,10 @@
 (defn- submap? [m1 m2]
   (= m1 (select-keys m2 (keys m1))))
 
+;; Prevents exceptions on non-strings.
+(defn- str-and-includes? [s substr]
+  (and (string? s) (str/includes? s substr)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def basic-cli-spec
@@ -68,7 +72,6 @@
    (if (= "" arg-str) ; str/split annoyingly returns [""]
      []
      (str/split arg-str #" "))
-   (:options cli-spec)
    cli-spec))
 
 (deftest basic-cli
@@ -80,7 +83,7 @@
                    ret))))
   (testing "options are validated"
     (let [ret (va basic-cli-spec "-x")]
-      (is (str/includes? (:exit-message ret) "Unknown option:"))))
+      (is (str-and-includes? (:exit-message ret) "Unknown option:"))))
   (testing "can have arguments and options"
     (let [ret (va basic-cli-spec "-n file1 file2")]
       (is (submap? {:command   []
@@ -98,14 +101,14 @@
                      ret))))
     (testing "options are validated"
       (let [ret (va subcommand-cli-spec "-x")]
-        (is (str/includes? (:exit-message ret) "Unknown option:")))))
+        (is (str-and-includes? (:exit-message ret) "Unknown option:")))))
   (testing "subcommand"
     (testing "must exist"
       (let [ret (va subcommand-cli-spec "bake-cake")]
-        (is (str/includes? (:exit-message ret) "Unknown command:"))))
+        (is (str-and-includes? (:exit-message ret) "Unknown command:"))))
     (testing "options are validated"
       (let [ret (va subcommand-cli-spec "commit -x")]
-        (is (str/includes? (:exit-message ret) "Unknown option:"))))
+        (is (str-and-includes? (:exit-message ret) "Unknown option:"))))
     (testing "is returned as `:command`"
       (let [ret (va subcommand-cli-spec "commit")]
         (is (submap? {:command ["commit"]} ret))))
@@ -136,6 +139,6 @@
       (is (submap? {:command ["iam"]} ret))))
   (testing "command must exist and error reflects depth of issue"
     (let [ret (va nested-cli-spec "iam missing")]
-      (is (str/includes? (:exit-message ret) "Unknown command: 'iam missing'")))
+      (is (str-and-includes? (:exit-message ret) "Unknown command: 'iam missing'")))
     (let [ret (va nested-cli-spec "you are missing")]
-      (is (str/includes? (:exit-message ret) "Unknown command: 'you'")))))
+      (is (str-and-includes? (:exit-message ret) "Unknown command: 'you'")))))
