@@ -13,34 +13,34 @@
               (last xs)))]
     (reduce m maps)))
 
-;; I'd love to have this be a one-liner that could take `cli-spec`,
-;; but having a map under :commands with just `nil` mapped to the
-;; commands sounds stupid.
-;;
-;; TODO: revisit once we do multi-level nesting.
-(defn get-command [cli-spec command-name]
-  (if command-name
-    (get-in cli-spec [:subcommands command-name])
-    cli-spec))
+(defn get-command [command-spec command-path]
+  (if (and command-spec (seq command-path))
+    (recur (get-in command-spec [:subcommands (first command-path)])
+           (rest command-path))
+    command-spec))
 
-;; Options summary is from `clojure.tools.cli`.  Could rework this and
-;; build it directly from `commands` (using functionality in
-;; `clojure.tools.cli`), I think.  That would be helpful for
-;; generating docs and such.  It's silly to process empty argument
-;; lists just to get the usage details.
-(defn usage [cli-spec command-name options-summary]
-  ;; TODO: If we're going to show any notion of parent command
-  ;; arguments (open question) then we need the path to the command,
-  ;; not just the command name.
-  (let [{:keys [options subcommands summary usage]}
-        (-> (:subcommands cli-spec)
-            (get-command command-name))]
+;; TODO: Rework this to make `option-summary` optional, and build it
+;; directly from `cli-spec` (using functionality in
+;; `clojure.tools.cli`, as needed).  Would be helpful for generating
+;; docs.  It's silly to process empty argument lists just to get usage
+;; instructions.
+(defn usage
+  "Return usage instruction string for command at the path
+  `command-path` in `cli-spec` specification.
+
+  `options-summary` is the summary returned by
+  `clojure.tools.cli/parse-opts` for the command."
+  [cli-spec command-path options-summary]
+  (when-let [{:keys [options subcommands summary usage]}
+             (get-command cli-spec command-path)]
     (->> [summary
           ""
           (str "Usage: "
                (:base-command cli-spec "command")
-               (when command-name
-                 (str " " command-name))
+               (when (seq command-path)
+                 (->> command-path
+                      (str/join " ")
+                      (str " ")))
                " " usage)
           (when (seq options)
             (str "\nOptions:\n" options-summary))
@@ -60,27 +60,28 @@
   "Validate command line arguments.  Either return a map indicating the
   program should exit (with an error message, and optional ok status),
   or a map indicating the action the program should take and the
-  options provided."
+  options / arguments provided."
   [raw-args option-defs cli-spec & [base]]
-  (let [{:keys [command-name options arguments errors summary]}
+  (let [{:keys [command-path options arguments errors summary]
+         :or   {command-path []}}
         (-> (cli/parse-opts raw-args option-defs :in-order true)
             (deep-merge base))
-        command (get-command cli-spec command-name)]
+        command (get-command cli-spec command-path)]
     (cond
       errors                             {:exit-message (error-msg errors)}
       (and (seq arguments)
-           (seq (:subcommands command))) (let [[sub-command-name & arguments] arguments]
-                                           (if-let [sub-command (get-command cli-spec sub-command-name)]
+           (seq (:subcommands command))) (let [[sub-command-name & arguments] arguments
+                                               sub-command-path               (conj command-path sub-command-name)]
+                                           (if-let [sub-command (get-command cli-spec sub-command-path)]
                                              (validate-args arguments
                                                             (:options sub-command)
                                                             cli-spec
-                                                            {:command-name sub-command-name
+                                                            {:command-path sub-command-path
                                                              :options      options})
-                                             {:exit-message (error-msg [(format "Unknown command: '%s'" sub-command-name)])}))
+                                             {:exit-message (error-msg [(format "Unknown command: '%s'"
+                                                                                (str/join " " sub-command-path))])}))
       ;; I think this is in the right place.  We'll parse down to the
       ;; deepest command before invoking help, meaning we'll show it
       ;; for the right command (not the parent command).
-      (:help options)                    {:exit-message (usage summary cli-spec command-name) :ok? true}
-      command                            {:command command-name :options options :arguments arguments}
-      ;; TODO: is this ever used now?
-      :else                              {:exit-message (usage summary cli-spec nil)})))
+      (:help options)                    {:exit-message (usage cli-spec command-path summary) :ok? true}
+      :else                              {:command command-path :options options :arguments arguments})))

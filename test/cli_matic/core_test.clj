@@ -26,17 +26,36 @@
                   :options [[nil  "--author <author>" "Override the commit author"]
                             ["-p" "--patch"           "Use interactive patch selection interface"]]}}})
 
+(def nested-cli-spec
+  {:summary     "Unified tool to manage your AWS services"
+   :usage       "[<options>] <command>"
+   :options     [[nil "--debug"]
+                 [nil "--profile <profile>"]]
+   :subcommands {"iam"
+                 {:summary "Identity and Access Management (IAM) commands"
+                  :usage   ""
+                  :subcommands {"add-role-to-instance-profile"
+                                {:summary "Adds the specified IAM role to the specified instance profile"
+                                 :usage   "<options>"
+                                 :options [[nil "--instance-profile-name <value>"]
+                                           [nil "--role-name <value>"]
+                                           [nil "--cli-input-json <json-str>"]
+                                           [nil "--cli-input-yaml <yaml-str>"]
+                                           [nil "--generate-cli-skeleton <value>"]]}}}}})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (deftest get-command
-  (is (= (sut/get-command subcommand-cli-spec nil)
-         subcommand-cli-spec)
-      "Return top-level command when passed `nil`")
-  (is (= (sut/get-command subcommand-cli-spec "commit")
-         (-> subcommand-cli-spec
+  (is (= (sut/get-command nested-cli-spec [])
+         nested-cli-spec)
+      "Return top-level command when passed `[]`")
+  (is (= (-> nested-cli-spec
              :subcommands
-             (get "commit")))
-      "Returns named command when passed a name"))
+             (get "iam")
+             :subcommands
+             (get "add-role-to-instance-profile"))
+         (sut/get-command nested-cli-spec ["iam" "add-role-to-instance-profile"]))
+      "Returns nested command when passed a path to a command"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -53,9 +72,9 @@
    cli-spec))
 
 (deftest basic-cli
-  (testing "`nil` is returned as `:command`"
+  (testing "`[]` is returned as `:command`"
     (let [ret (va basic-cli-spec "")]
-      (is (submap? {:command   nil
+      (is (submap? {:command   []
                     :options   {}
                     :arguments []}
                    ret))))
@@ -64,13 +83,19 @@
       (is (str/includes? (:exit-message ret) "Unknown option:"))))
   (testing "can have arguments and options"
     (let [ret (va basic-cli-spec "-n file1 file2")]
-      (is (submap? {:command   nil
+      (is (submap? {:command   []
                     :options   {:skip-newline true}
                     :arguments ["file1" "file2"]}
                    ret)))))
 
 (deftest subcommand-cli
   (testing "root command"
+    (testing "`[]` is returned as `:command`"
+      (let [ret (va subcommand-cli-spec "")]
+        (is (submap? {:command   []
+                      :options   {}
+                      :arguments []}
+                     ret))))
     (testing "options are validated"
       (let [ret (va subcommand-cli-spec "-x")]
         (is (str/includes? (:exit-message ret) "Unknown option:")))))
@@ -83,18 +108,34 @@
         (is (str/includes? (:exit-message ret) "Unknown option:"))))
     (testing "is returned as `:command`"
       (let [ret (va subcommand-cli-spec "commit")]
-        (is (submap? {:command "commit"} ret))))
+        (is (submap? {:command ["commit"]} ret))))
     (testing "can have arguments and options"
       (let [ret (va subcommand-cli-spec "commit --patch --author cameron@collbox.co core.clj")]
-        (is (submap? {:command   "commit"
+        (is (submap? {:command   ["commit"]
                       :options   {:author "cameron@collbox.co"
                                   :patch  true}
                       :arguments ["core.clj"]}
                      ret))))
     (testing "inherits higher-level options"
       (let [ret (va subcommand-cli-spec "--git-dir=/other/proj/.git commit --patch core.clj")]
-        (is (submap? {:command   "commit"
+        (is (submap? {:command   ["commit"]
                       :options   {:git-dir "/other/proj/.git"
                                   :patch   true}
                       :arguments ["core.clj"]}
                      ret))))))
+
+(deftest nested-cli
+  (testing "returns nested command and all layers of arguments merged"
+    (let [ret (va nested-cli-spec "--profile collbox --debug iam add-role-to-instance-profile foo")]
+      (is (submap? {:command   ["iam" "add-role-to-instance-profile"]
+                    :options   {:debug   true
+                                :profile "collbox"}
+                    :arguments ["foo"]} ret))))
+  (testing "parent commands can be run directly"
+    (let [ret (va nested-cli-spec "iam")]
+      (is (submap? {:command ["iam"]} ret))))
+  (testing "command must exist and error reflects depth of issue"
+    (let [ret (va nested-cli-spec "iam missing")]
+      (is (str/includes? (:exit-message ret) "Unknown command: 'iam missing'")))
+    (let [ret (va nested-cli-spec "you are missing")]
+      (is (str/includes? (:exit-message ret) "Unknown command: 'you'")))))
