@@ -30,8 +30,7 @@ should be somewhat familiar to anyone who has used
                   {:summary "Record changes to the repository"
                    :usage   "[<options>] [--] [<pathspec> ...]"
                    :options [[nil  "--author <author>" "Override the commit author"]
-                             ["-p" "--patch"           "Use interactive
-                             patch selection interface"]]}}})
+                             ["-p" "--patch"           "Use interactive patch selection interface"]]}}})
 ```
 
 With this map in place, we can now parse arguments (as they would be
