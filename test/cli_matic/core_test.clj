@@ -50,7 +50,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (deftest get-command
-  (is (= (sut/get-command nested-cli-spec [])
+  (is (= (#'sut/get-command nested-cli-spec [])
          nested-cli-spec)
       "Return top-level command when passed `[]`")
   (is (= (-> nested-cli-spec
@@ -58,7 +58,7 @@
              (get "iam")
              :subcommands
              (get "add-role-to-instance-profile"))
-         (sut/get-command nested-cli-spec ["iam" "add-role-to-instance-profile"]))
+         (#'sut/get-command nested-cli-spec ["iam" "add-role-to-instance-profile"]))
       "Returns nested command when passed a path to a command"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

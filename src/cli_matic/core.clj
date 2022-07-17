@@ -19,11 +19,27 @@
        (sort)
        (pprint/cl-format nil "Commands:~%~:{  ~A~20T~A~:^~%~}")))
 
-(defn get-command [command-spec command]
+(defn- get-command [command-spec command]
   (if (and command-spec (seq command))
     (recur (get-in command-spec [:subcommands (first command)])
            (rest command))
     command-spec))
+
+(defn- error-msg [errors]
+  (str "The following errors occurred while parsing your command:\n\n"
+       (str/join \newline errors)))
+
+(defn- unknown-command-msg [cli-spec command]
+  (let [command-name          (str/join " " command)
+        {:keys [subcommands]} (get-command cli-spec (butlast command))
+        msg                   (str (format "Unknown command: '%s'" command-name)
+                                   (when (seq subcommands)
+                                     (str "\n\n"
+                                          (commands-summary subcommands))))]
+    (error-msg [msg])))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Public
 
 (defn usage
   "Return usage instruction string for command at the path `command` in
@@ -53,19 +69,6 @@
             (str "\n" (commands-summary subcommands)))]
           (remove nil?)
           (str/join \newline)))))
-
-(defn- error-msg [errors]
-  (str "The following errors occurred while parsing your command:\n\n"
-       (str/join \newline errors)))
-
-(defn- unknown-command-msg [cli-spec command]
-  (let [command-name          (str/join " " command)
-        {:keys [subcommands]} (get-command cli-spec (butlast command))
-        msg                   (str (format "Unknown command: '%s'" command-name)
-                                   (when (seq subcommands)
-                                     (str "\n\n"
-                                          (commands-summary subcommands))))]
-    (error-msg [msg])))
 
 (defn validate-args
   "Validate command line arguments.  Either return a map indicating the
