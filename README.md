@@ -54,8 +54,15 @@ passed to a `-main` function):
 ;; => {:command ["commit"], :options {:patch true, :author "cameron@collbox.co"}, :arguments []}
 
 ;; $ git lost
-(cli/validate-args ["lost"] git-cli-spec)
-;; => {:exit-message "The following errors occurred while parsing your command:\n\nUnknown command: 'lost'"}
+(-> (cli/validate-args ["lost"] git-cli-spec)
+    :exit-message
+    print)
+;; out> The following errors occurred while parsing your command:
+;; out>
+;; out> Unknown command: 'lost'
+;; out>
+;; out> Commands:
+;; out>   commit            Record changes to the repository
 ```
 
 n.b. the command your program should subsequently invoke is denoted by
