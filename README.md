@@ -1,5 +1,7 @@
 # cli-matic
 
+[![ci][]](https://dl.circleci.com/status-badge/redirect/gh/collbox/cli-matic/tree/develop)
+
 Data-driven argument parsing library for complex Clojure CLIs.
 
 ## Introduction
@@ -96,5 +98,6 @@ Copyright © CollBox Inc., 2022
 Distributed under the MIT License.
 
 [aws-cli]: https://aws.amazon.com/cli/
+[ci]: https://dl.circleci.com/status-badge/img/gh/collbox/cli-matic/tree/develop.svg?style=svg
 [clojure.tools.cli]: https://github.com/clojure/tools.cli
 [git]: https://git-scm.com/
