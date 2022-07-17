@@ -10,7 +10,8 @@ of building complex CLIs with nested subcommands, like you'll find in
 
 ## Dependency Information
 
-*Coming soon to a repo near you.*
+*Coming soon.  This project is very new and the API could still
+change.*
 
 ## Usage
 
