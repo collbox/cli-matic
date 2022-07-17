@@ -1,0 +1,33 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: cimg/clojure:1.11.1
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "deps.edn" }}
+          - v1-dependencies-
+
+      - run:
+          name: Install dependencies
+          command: clojure -P -M:test
+
+      - save_cache:
+          paths:
+            - ~/.deps-clj
+            - ~/.gitlibs
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "deps.edn" }}
+
+      - run:
+          name: Run tests
+          command: clojure -X:test
+
+workflows:
+  test:
+    jobs:
+      - test
