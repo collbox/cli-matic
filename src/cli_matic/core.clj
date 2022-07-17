@@ -19,38 +19,37 @@
            (rest command))
     command-spec))
 
-;; TODO: Rework this to make `option-summary` optional, and build it
-;; directly from `cli-spec` (using functionality in
-;; `clojure.tools.cli`, as needed).  Would be helpful for generating
-;; docs.  It's silly to process empty argument lists just to get usage
-;; instructions.
 (defn usage
   "Return usage instruction string for command at the path `command` in
   `cli-spec` specification.
 
   `options-summary` is the summary returned by `cli/parse-opts` for
   the command."
-  [cli-spec command options-summary]
-  (when-let [{:keys [options subcommands summary usage]}
-             (get-command cli-spec command)]
-    (->> [summary
-          ""
-          (str "Usage: "
-               (:base-command cli-spec "command")
-               (when (seq command)
-                 (->> command
-                      (str/join " ")
-                      (str " ")))
-               " " usage)
-          (when (seq options)
-            (str "\nOptions:\n" options-summary))
-          (when (seq subcommands)
-            (->> subcommands
-                 (map (fn [[nm sub]] [nm (:summary sub)]))
-                 (sort)
-                 (pprint/cl-format nil "~%Commands:~%~:{  ~A~20T~A~:^~%~}")))]
-         (remove nil?)
-         (str/join \newline))))
+  ([cli-spec command]
+   (let [command-spec      (get-command cli-spec command)
+         {:keys [summary]} (cli/parse-opts command (:options command-spec))]
+     (usage cli-spec command summary)))
+  ([cli-spec command options-summary]
+   (when-let [{:keys [options subcommands summary usage]}
+              (get-command cli-spec command)]
+     (->> [summary
+           ""
+           (str "Usage: "
+                (:base-command cli-spec "command")
+                (when (seq command)
+                  (->> command
+                       (str/join " ")
+                       (str " ")))
+                " " usage)
+           (when (seq options)
+             (str "\nOptions:\n" options-summary))
+           (when (seq subcommands)
+             (->> subcommands
+                  (map (fn [[nm sub]] [nm (:summary sub)]))
+                  (sort)
+                  (pprint/cl-format nil "~%Commands:~%~:{  ~A~20T~A~:^~%~}")))]
+          (remove nil?)
+          (str/join \newline)))))
 
 (defn- error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
