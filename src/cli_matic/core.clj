@@ -13,6 +13,12 @@
               (last xs)))]
     (reduce m maps)))
 
+(defn- commands-summary [commands]
+  (->> commands
+       (map (fn [[nm sub]] [nm (:summary sub)]))
+       (sort)
+       (pprint/cl-format nil "Commands:~%~:{  ~A~20T~A~:^~%~}")))
+
 (defn get-command [command-spec command]
   (if (and command-spec (seq command))
     (recur (get-in command-spec [:subcommands (first command)])
@@ -44,10 +50,7 @@
            (when (seq options)
              (str "\nOptions:\n" options-summary))
            (when (seq subcommands)
-             (->> subcommands
-                  (map (fn [[nm sub]] [nm (:summary sub)]))
-                  (sort)
-                  (pprint/cl-format nil "~%Commands:~%~:{  ~A~20T~A~:^~%~}")))]
+            (str "\n" (commands-summary subcommands)))]
           (remove nil?)
           (str/join \newline)))))
 
@@ -55,12 +58,14 @@
   (str "The following errors occurred while parsing your command:\n\n"
        (str/join \newline errors)))
 
-(defn- unknown-command-msg [command]
-  (->> command
-       (str/join " ")
-       (format "Unknown command: '%s'")
-       vector
-       error-msg))
+(defn- unknown-command-msg [cli-spec command]
+  (let [command-name          (str/join " " command)
+        {:keys [subcommands]} (get-command cli-spec (butlast command))
+        msg                   (str (format "Unknown command: '%s'" command-name)
+                                   (when (seq subcommands)
+                                     (str "\n\n"
+                                          (commands-summary subcommands))))]
+    (error-msg [msg])))
 
 (defn validate-args
   "Validate command line arguments.  Either return a map indicating the
@@ -82,4 +87,4 @@
                                 :options options})
         (:help options) {:exit-message (usage cli-spec command summary) :ok? true}
         :else           {:command command :options options :arguments arguments}))
-    {:exit-message (unknown-command-msg command)}))
+    {:exit-message (unknown-command-msg cli-spec command)}))
