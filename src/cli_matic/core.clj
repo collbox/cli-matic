@@ -81,13 +81,13 @@
           (-> (cli/parse-opts raw-args (:options command-spec) :in-order true)
               (deep-merge base))]
       (cond
-        errors          {:exit-message (error-msg errors)}
+        errors           {:exit-message (error-msg errors)}
         (and (seq (:subcommands command-spec))
              (seq arguments))
-        ,               (recur (rest arguments)
-                               cli-spec
-                               {:command (conj command (first arguments))
-                                :options options})
-        (:help options) {:exit-message (usage cli-spec command summary) :ok? true}
-        :else           {:command command :options options :arguments arguments}))
+        ,                (recur (rest arguments)
+                                cli-spec
+                                {:command (conj command (first arguments))
+                                 :options options})
+        (::help options) {:exit-message (usage cli-spec command summary) :ok? true}
+        :else            {:command command :options options :arguments arguments}))
     {:exit-message (unknown-command-msg cli-spec command)}))
