@@ -60,8 +60,10 @@
              :subcommands
              (get "iam")
              :subcommands
-             (get "add-role-to-instance-profile"))
-         (#'sut/get-command nested-cli-spec ["iam" "add-role-to-instance-profile"]))
+             (get "add-role-to-instance-profile")
+             :summary)
+         (-> (#'sut/get-command nested-cli-spec ["iam" "add-role-to-instance-profile"])
+             :summary))
       "Returns nested command when passed a path to a command"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
