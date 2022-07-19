@@ -34,6 +34,8 @@
   {:summary     "Unified tool to manage your AWS services"
    :usage       "[<options>] <command>"
    :options     [[nil "--debug"]
+                 [nil "--help"
+                  :id :cli-matic.core/help]
                  [nil "--profile <profile>"]]
    :subcommands {"iam"
                  {:summary "Identity and Access Management (IAM) commands"
@@ -142,3 +144,13 @@
       (is (str-and-includes? (:exit-message ret) "Unknown command: 'iam missing'")))
     (let [ret (va nested-cli-spec "you are missing")]
       (is (str-and-includes? (:exit-message ret) "Unknown command: 'you'")))))
+
+(deftest help
+  (testing "root command has help option, but subcommand doesn't"
+    (is (:ok? (va nested-cli-spec "--help")))
+    (is (not (:ok? (va nested-cli-spec "iam --help")))))
+  (testing "both have help when inheriting option"
+    (let [cli-spec (update nested-cli-spec :inherited-options conj :cli-matic.core/help)]
+      (is (:ok? (va cli-spec "--help")))
+      (is (:ok? (va cli-spec "iam --help")))
+      (is (:ok? (va cli-spec "--help iam"))))))

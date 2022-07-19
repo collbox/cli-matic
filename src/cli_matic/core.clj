@@ -19,9 +19,61 @@
        (sort)
        (pprint/cl-format nil "Commands:~%~:{  ~A~20T~A~:^~%~}")))
 
-(defn- get-command [command-spec command]
+;; TODO:
+;; Multiple option entries can share the same :id in order to
+;; transform a value in different ways, but only one of these option
+;; entries may contain a :default(-fn) entry.
+;;
+;; This is how they check for duplicate options:
+;;   Assert failed: (distinct?* (remove nil? (map :long-opt %)))
+;;
+;; ID doesn't really do it...it could lead to different arguments
+;; parsing to the same ID.  Is that ok?  It seems weird.
+;;
+;;  (merge-options [["-h" "--help" nil :id :help]]
+;;                 [["-v" "--very-helpful"]])
+(defn- option-id
+  "Return ID of option from option spec."
+  [[_short-opt _long-opt _desc & _rst :as opt]]
+  #_(or (->> rst (apply hash-map) :id)
+      (when long-opt
+        (rest (re-find #"^(--[^ =]+)(?:[ =](.*))?" long-opt)))
+      ;; More to do here, use their implementation for now.
+      (throw
+       (ex-info "Option does not have an ID" {:opt opt})))
+  (or (:id (#'clojure.tools.cli/compile-spec opt))
+      (throw
+       (ex-info "Option does not have an ID" {:opt opt}))))
+
+(defn- find-options
+  "Find options by ID."
+  [options ids]
+  (filter (comp (set ids) option-id) options))
+
+(defn- merge-options
+  "Merge two option lists, prefering options in opts2."
+  [opts1 opts2]
+  (cond
+    (not (seq opts1)) opts2
+    (not (seq opts2)) opts1
+    :else
+    (->> (concat opts1 opts2)
+         (map (juxt option-id identity))
+         (into {})
+         vals)))
+
+(defn- inherit-options [command-spec inherited-options]
+  (update command-spec :options merge-options inherited-options))
+
+(defn- get-command
+  "Return command-spec of `command`, merging in any inherited options as
+  we traverse the tree of subcommands."
+  [{:keys [inherited-options options] :as command-spec} command]
   (if (and command-spec (seq command))
-    (recur (get-in command-spec [:subcommands (first command)])
+    (recur (some-> command-spec
+                   :subcommands
+                   (get (first command))
+                   (inherit-options (find-options options inherited-options)))
            (rest command))
     command-spec))
 
