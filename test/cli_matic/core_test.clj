@@ -37,7 +37,8 @@
                  [nil "--help"
                   :id :cli-matic.core/help]
                  [nil "--profile <profile>"]]
-   :subcommands {"iam"
+   :subcommands {"help" :cli-matic.core/help
+                 "iam"
                  {:summary "Identity and Access Management (IAM) commands"
                   :usage   ""
                   :subcommands {"add-role-to-instance-profile"
@@ -146,11 +147,18 @@
       (is (str-and-includes? (:exit-message ret) "Unknown command: 'you'")))))
 
 (deftest help
-  (testing "root command has help option, but subcommand doesn't"
+  (testing "root command has help option, but subcommands don't"
     (is (:ok? (va nested-cli-spec "--help")))
     (is (not (:ok? (va nested-cli-spec "iam --help")))))
-  (testing "both have help when inheriting option"
+  (testing "all levels have help option when inheriting option"
     (let [cli-spec (update nested-cli-spec :inherited-options conj :cli-matic.core/help)]
       (is (:ok? (va cli-spec "--help")))
       (is (:ok? (va cli-spec "iam --help")))
-      (is (:ok? (va cli-spec "--help iam"))))))
+      (is (:ok? (va cli-spec "--help iam")))))
+  (testing "root command has help subcommand, but subcommands don't"
+    (is (:ok? (va nested-cli-spec "help")))
+    (is (not (:ok? (va nested-cli-spec "iam help")))))
+  (testing "all levels have help subcommand when inheriting subcommands"
+    (let [cli-spec (update nested-cli-spec :inherited-subcommands conj "help")]
+      (is (:ok? (va cli-spec "help")))
+      (is (:ok? (va cli-spec "iam help"))))))

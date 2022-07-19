@@ -4,6 +4,13 @@
             [clojure.string :as str]
             [clojure.tools.cli :as cli]))
 
+;; We'll want to show help for the super command, so make sure we can
+;; access its details.
+;;
+;; TODO: Help output is garbage right now.
+(def magic-commands
+  {::help {:summary "Show help for command"}})
+
 (defn- deep-merge
   "Recursively merges maps."
   [& maps]
@@ -63,17 +70,25 @@
          vals)))
 
 (defn- inherit-options [command-spec inherited-options]
-  (update command-spec :options merge-options inherited-options))
+  (if (map? command-spec)
+    (update command-spec :options merge-options inherited-options)
+    command-spec))
+
+(defn- inherit-subcommands [command-spec inherited-subcommands]
+  (if (map? command-spec)
+    (update command-spec :subcommands (partial merge inherited-subcommands))
+    command-spec))
 
 (defn- get-command
   "Return command-spec of `command`, merging in any inherited options as
   we traverse the tree of subcommands."
-  [{:keys [inherited-options options] :as command-spec} command]
+  [{:keys [inherited-options inherited-subcommands options subcommands] :as command-spec} command]
   (if (and command-spec (seq command))
     (recur (some-> command-spec
                    :subcommands
                    (get (first command))
-                   (inherit-options (find-options options inherited-options)))
+                   (inherit-options (find-options options inherited-options))
+                   (inherit-subcommands (select-keys subcommands inherited-subcommands)))
            (rest command))
     command-spec))
 
@@ -104,8 +119,9 @@
          {:keys [summary]} (cli/parse-opts command (:options command-spec))]
      (usage cli-spec command summary)))
   ([cli-spec command options-summary]
-   (when-let [{:keys [options subcommands summary usage]}
+   (when-let [{:keys [options subcommands summary usage] :as command-spec}
               (get-command cli-spec command)]
+     (prn command-spec)
      (->> [summary
            ""
            (str "Usage: "
@@ -129,17 +145,19 @@
   options / arguments provided."
   [raw-args cli-spec & {:keys [command] :or {command []} :as base}]
   (if-let [command-spec (get-command cli-spec command)]
-    (let [{:keys [options arguments errors summary]}
-          (-> (cli/parse-opts raw-args (:options command-spec) :in-order true)
-              (deep-merge base))]
-      (cond
-        errors           {:exit-message (error-msg errors)}
-        (and (seq (:subcommands command-spec))
-             (seq arguments))
-        ,                (recur (rest arguments)
-                                cli-spec
-                                {:command (conj command (first arguments))
-                                 :options options})
-        (::help options) {:exit-message (usage cli-spec command summary) :ok? true}
-        :else            {:command command :options options :arguments arguments}))
+    (if (magic-commands command-spec)
+      {:exit-message (usage cli-spec command) :ok? true}
+      (let [{:keys [options arguments errors summary]}
+            (-> (cli/parse-opts raw-args (:options command-spec) :in-order true)
+                (deep-merge base))]
+        (cond
+          errors           {:exit-message (error-msg errors)}
+          (and (seq (:subcommands command-spec))
+               (seq arguments))
+          ,                (recur (rest arguments)
+                                  cli-spec
+                                  {:command (conj command (first arguments))
+                                   :options options})
+          (::help options) {:exit-message (usage cli-spec command summary) :ok? true}
+          :else            {:command command :options options :arguments arguments})))
     {:exit-message (unknown-command-msg cli-spec command)}))
